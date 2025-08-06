@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- App Info -->
+    <key>CFBundleName</key>
+    <string>iCopy</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.jbluebird.iCopy</string>
+    <key>CFBundleVersion</key>
+    <string>1.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+
+    <!-- Speech Recognition Usage -->
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>This app needs access to speech recognition to transcribe voice memos.</string>
+
+    <!-- Microphone Usage -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app requires microphone access to record or transcribe audio.</string>
+
+    <!-- File Access (optional, if sandboxed, adjust as needed) -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+</dict>
+</plist>
