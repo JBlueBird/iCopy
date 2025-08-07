@@ -1,4 +1,3 @@
-
 # I made a app to easily get your music off of old iPods
 
 ![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-397g0bn52hhf1.png?width=640&crop=smart&auto=webp&s=f107b1a2ff1cd941b3d399f411d106d0ef9e9037)
@@ -19,6 +18,7 @@
 
 **iCopy - Transfer your music with ease**
 
+![Stars](https://img.shields.io/github/stars/JBlueBird/iCopy?style=flat) ![Last Commit](https://img.shields.io/github/last-commit/JBlueBird/iCopy)  ![Last Commit](https://img.shields.io/badge/iCopy_Versions_Released-3-blue)
 
 I built a macOS app called iCopy that lets you transfer music, photos, and voice memos from old iPods (like the classic ones with hard drives) without using iTunes.
 
