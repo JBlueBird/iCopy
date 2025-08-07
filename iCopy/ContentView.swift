@@ -2,246 +2,7 @@ import SwiftUI
 import AVFoundation
 import AppKit
 import Speech
-
-// MARK: - Data Model
-
-struct Track: Identifiable, Hashable {
-    let id = UUID()
-    let url: URL
-    let title: String
-    let artist: String
-    let album: String
-    let artwork: NSImage?
-}
-
-// MARK: - Media Category Enum
-
-enum MediaCategory: String, CaseIterable, Identifiable {
-    case music = "Music"
-    case photos = "Photos"
-    case voiceMemos = "Voice Memos"
-    
-    var id: String { rawValue }
-}
-
-// MARK: - Main App
-
-@main
-struct iCopyApp: App {
-    @StateObject private var vm = iCopyViewModel()
-
-    var body: some Scene {
-        WindowGroup {
-            NavigationSplitView {
-                // Sidebar
-                List(selection: $vm.selectedCategory) {
-                    ForEach(MediaCategory.allCases) { category in
-                        Label(category.rawValue, systemImage: iconName(for: category))
-                            .tag(category)
-                    }
-                }
-                .listStyle(SidebarListStyle())
-                .frame(minWidth: 150)
-                
-            } detail: {
-                VStack {
-                    // Content Area
-                    switch vm.selectedCategory {
-                    case .music:
-                        MusicView(vm: vm)
-                    case .photos:
-                        PhotoGridView(vm: vm)
-                    case .voiceMemos:
-                        VoiceMemoListView(vm: vm)
-                    }
-                }.onChange(of: vm.selectedCategory) { newCategory in
-                    vm.statusMessage = "Scanning..."
-                    switch newCategory {
-                    case .music:
-                        vm.autoDetectiPod()
-                    case .photos:
-                        vm.autoDetectPhotos()
-                    case .voiceMemos:
-                        vm.autoDetectVoiceMemos()
-                    }
-                }
-
-                .frame(minWidth: 600, minHeight: 500)
-                .navigationTitle(vm.selectedCategory.rawValue)
-                .onAppear {
-                    if vm.selectedCategory == .music {
-                        vm.autoDetectiPod()
-                    }
-                }
-            }
-        }
-    }
-    
-    func iconName(for category: MediaCategory) -> String {
-        switch category {
-        case .music: return "music.note.list"
-        case .photos: return "photo"
-        case .voiceMemos: return "mic"
-        }
-    }
-}
-
-// MARK: - Music View
-
-struct MusicView: View {
-    @ObservedObject var vm: iCopyViewModel
-    
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                Button("Copy Selected") {
-                    vm.copySelectedTracks()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(vm.filteredTracks.isEmpty || vm.selectedTracks.isEmpty)
-                
-                Button("Copy All") {
-                    vm.copyAllTracks()
-                }
-                .buttonStyle(.bordered)
-                .disabled(vm.filteredTracks.isEmpty)
-                Button("Import Folder") {
-                    vm.selectMediaFolder()
-                }
-                .buttonStyle(.borderedProminent)
-                Spacer()
-                TextField("Search \(vm.selectedCategory.rawValue)", text: $vm.searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 300)
-                
-            }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-            MiniPlayerView(vm: vm)
-
-            Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    ForEach(vm.sortedArtistsFiltered, id: \.self) { artist in
-                        VStack(alignment: .leading, spacing: 12) {
-                            //Text(artist)
-                               // .font(.title2)
-                                //.bold()
-                               // .padding(.leading)
-                            
-                            ForEach(vm.sortedAlbumsFiltered(for: artist), id: \.self) { album in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        AlbumArtworkView(artwork: vm.filteredGroupedTracks[artist]![album]!.first?.artwork)
-                                            .frame(width: 80, height: 80)
-                                            .cornerRadius(8)
-                                        VStack {
-                                            HStack{Text(album)
-                                                    .bold()
-                                                    .font(.title3)
-                                                .foregroundColor(.secondary);Spacer()}
-                                            HStack{Text("by \(artist)");Spacer()}
-                                        }
-                                        
-                                        Spacer()
-                                    }
-                                    .padding(.leading)
-                                    Spacer()
-                                    
-                                    VStack {
-                                        ForEach(vm.filteredGroupedTracks[artist]![album]!) { track in
-                                            HStack {
-                                                TrackRow(track: track, isSelected: vm.selectedTracks.contains(track.id)) {
-                                                    if vm.selectedTracks.contains(track.id) {
-                                                        vm.selectedTracks.remove(track.id)
-                                                    } else {
-                                                        vm.selectedTracks.insert(track.id)
-                                                    }
-                                                }
-                                                Button(action: { vm.play(track: track) }) {
-                                                    Image(systemName: "play.circle").font(.title)
-                                                }.padding()
-                                                .buttonStyle(.plain)
-                                            }
-                                        }
-                                    }
-                                    .padding(.leading, 100)
-                                    //
-                                }
-                            }
-                        }
-                        Divider()
-                            .padding(.vertical, 12)
-                    }
-                }
-                .padding(.vertical)
-            }
-        }
-    }
-}
-
-// MARK: - Album Artwork View
-
-struct AlbumArtworkView: View {
-    var artwork: NSImage?
-    
-    var body: some View {
-        if let img = artwork {
-            Image(nsImage: img)
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .shadow(radius: 3)
-            
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
-                .overlay(
-                    Image(systemName: "ipod")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray)
-                )
-        }
-    }
-}
-
-// MARK: - Track Row
-
-struct TrackRow: View {
-    let track: Track
-    let isSelected: Bool
-    let onToggle: () -> Void
-    
-    var body: some View {
-        HStack(spacing: 14) {
-            Button(action: onToggle) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : .gray)
-                    .font(.system(size: 20))
-            }
-            .buttonStyle(.plain)
-            
-            
-            VStack(alignment: .leading) {
-                Text(track.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(track.url.lastPathComponent)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            
-            Spacer()
-        }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        //.hoverEffect(.highlight)
-    }
-}
-
+import Foundation
 // MARK: - ViewModel
 
 class iCopyViewModel: ObservableObject {
@@ -646,6 +407,252 @@ class iCopyViewModel: ObservableObject {
         return formatter.string(from: Date())
     }
 }
+// MARK: - Data Model
+
+struct Track: Identifiable, Hashable {
+    let id = UUID()
+    let url: URL
+    let title: String
+    let artist: String
+    let album: String
+    let artwork: NSImage?
+}
+
+// MARK: - Media Category Enum
+
+enum MediaCategory: String, CaseIterable, Identifiable {
+    case music = "Music"
+    case photos = "Photos"
+    case voiceMemos = "Voice Memos"
+    
+    var id: String { rawValue }
+}
+
+// MARK: - Main App
+
+@main
+struct iCopyApp: App {
+    @StateObject private var vm = iCopyViewModel()
+    @State var updateview = false
+    var body: some Scene {
+        WindowGroup {
+            NavigationSplitView {
+                // Sidebar
+                List(selection: $vm.selectedCategory) {
+                    ForEach(MediaCategory.allCases) { category in
+                        Label(category.rawValue, systemImage: iconName(for: category))
+                            .tag(category)
+                    }
+                }
+                .listStyle(SidebarListStyle())
+                .frame(minWidth: 150)
+                
+            } detail: {
+                VStack {
+                    // Content Area
+                    switch vm.selectedCategory {
+                    case .music:
+                        MusicView(vm: vm)
+                    case .photos:
+                        PhotoGridView(vm: vm)
+                    case .voiceMemos:
+                        VoiceMemoListView(vm: vm)
+                    }
+                }.onChange(of: vm.selectedCategory) { newCategory in
+                    vm.statusMessage = "Scanning..."
+                    switch newCategory {
+                    case .music:
+                        vm.autoDetectiPod()
+                    case .photos:
+                        vm.autoDetectPhotos()
+                    case .voiceMemos:
+                        vm.autoDetectVoiceMemos()
+                    }
+                }
+
+                .frame(minWidth: 600, minHeight: 500)
+                .navigationTitle(vm.selectedCategory.rawValue)
+                .onAppear {
+                    if vm.selectedCategory == .music {
+                        vm.autoDetectiPod()
+                    }
+                }
+            }.toolbar {
+                Button("Update iCopy") {
+                    updateview.toggle()
+                }
+            }.sheet(isPresented: $updateview, content: {
+                UpdateView()
+            })
+        }
+    }
+    
+    func iconName(for category: MediaCategory) -> String {
+        switch category {
+        case .music: return "music.note.list"
+        case .photos: return "photo"
+        case .voiceMemos: return "mic"
+        }
+    }
+}
+
+// MARK: - Music View
+
+struct MusicView: View {
+    @ObservedObject var vm: iCopyViewModel
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Button("Copy Selected") {
+                    vm.copySelectedTracks()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(vm.filteredTracks.isEmpty || vm.selectedTracks.isEmpty)
+                
+                Button("Copy All") {
+                    vm.copyAllTracks()
+                }
+                .buttonStyle(.bordered)
+                .disabled(vm.filteredTracks.isEmpty)
+                Button("Import Folder") {
+                    vm.selectMediaFolder()
+                }
+                .buttonStyle(.borderedProminent)
+                Spacer()
+                TextField("Search \(vm.selectedCategory.rawValue)", text: $vm.searchText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: 300)
+                
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+            MiniPlayerView(vm: vm)
+
+            Divider()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    ForEach(vm.sortedArtistsFiltered, id: \.self) { artist in
+                        VStack(alignment: .leading, spacing: 12) {
+                            //Text(artist)
+                               // .font(.title2)
+                                //.bold()
+                               // .padding(.leading)
+                            
+                            ForEach(vm.sortedAlbumsFiltered(for: artist), id: \.self) { album in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 12) {
+                                        AlbumArtworkView(artwork: vm.filteredGroupedTracks[artist]![album]!.first?.artwork)
+                                            .frame(width: 80, height: 80)
+                                            .cornerRadius(8)
+                                        VStack {
+                                            HStack{Text(album)
+                                                    .bold()
+                                                    .font(.title3)
+                                                .foregroundColor(.secondary);Spacer()}
+                                            HStack{Text("by \(artist)");Spacer()}
+                                        }
+                                        
+                                        Spacer()
+                                    }
+                                    .padding(.leading)
+                                    Spacer()
+                                    
+                                    VStack {
+                                        ForEach(vm.filteredGroupedTracks[artist]![album]!) { track in
+                                            HStack {
+                                                TrackRow(track: track, isSelected: vm.selectedTracks.contains(track.id)) {
+                                                    if vm.selectedTracks.contains(track.id) {
+                                                        vm.selectedTracks.remove(track.id)
+                                                    } else {
+                                                        vm.selectedTracks.insert(track.id)
+                                                    }
+                                                }
+                                                Button(action: { vm.play(track: track) }) {
+                                                    Image(systemName: "play.circle").font(.title)
+                                                }.padding()
+                                                .buttonStyle(.plain)
+                                            }
+                                        }
+                                    }
+                                    .padding(.leading, 100)
+                                    //
+                                }
+                            }
+                        }
+                        Divider()
+                            .padding(.vertical, 12)
+                    }
+                }
+                .padding(.vertical)
+            }
+        }
+    }
+}
+
+// MARK: - Album Artwork View
+
+struct AlbumArtworkView: View {
+    var artwork: NSImage?
+    
+    var body: some View {
+        if let img = artwork {
+            Image(nsImage: img)
+                .resizable()
+                .scaledToFill()
+                .clipped()
+                .shadow(radius: 3)
+            
+        } else {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.gray.opacity(0.3))
+                .overlay(
+                    Image(systemName: "ipod")
+                        .font(.system(size: 40))
+                        .foregroundColor(.gray)
+                )
+        }
+    }
+}
+
+// MARK: - Track Row
+
+struct TrackRow: View {
+    let track: Track
+    let isSelected: Bool
+    let onToggle: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 14) {
+            Button(action: onToggle) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isSelected ? .accentColor : .gray)
+                    .font(.system(size: 20))
+            }
+            .buttonStyle(.plain)
+            
+            
+            VStack(alignment: .leading) {
+                Text(track.title)
+                    .font(.headline)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Text(track.url.lastPathComponent)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        //.hoverEffect(.highlight)
+    }
+}
+
+
 
 // MARK: - PhotoItem
 
@@ -1164,5 +1171,160 @@ struct MiniPlayerView: View {
         let mins = Int(time) / 60
         let secs = Int(time) % 60
         return String(format: "%d:%02d", mins, secs)
+    }
+}
+struct UpdateView: View {
+    @Environment(\.dismiss) var dismiss
+    
+    // Current app version - set yours here or pass in init
+    let currentAppVersion = "1.2"
+    
+    // State vars
+    @State private var statusMessage = "Ready to check for updates."
+    @State private var isChecking = false
+    @State private var isDownloading = false
+    @State private var updateAvailable = false
+    @State private var latestVersion: String?
+    @State private var errorMessage: String?
+    
+    var body: some View {
+        VStack() {
+            Text("iCopy Update")
+                .font(.title)
+                .bold()
+            Divider()
+            
+            Text(statusMessage)
+                .multilineTextAlignment(.center)
+                .padding()
+            
+            if isChecking || isDownloading {
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle())
+            }
+            
+            if statusMessage == "No updates available. You're up to date!" {} else {
+                if statusMessage == "Update installed! Check your downloads folder." {
+                    EmptyView()
+                } else {
+                    Button("Download and Install Update \(latestVersion ?? "")") {
+                        downloadAndInstallUpdate()
+                    }.disabled(isDownloading).onAppear(perform: checkForUpdate)
+                }
+            }
+            
+            if let error = errorMessage {
+                Text("Error: \(error)")
+                    .foregroundColor(.red)
+            }
+            
+            Button("Close") {
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+        }
+        .padding(30)
+        .frame(width: 350)
+    }
+    
+    func checkForUpdate() {
+        isChecking = true
+        errorMessage = nil
+        updateAvailable = false
+        statusMessage = "Checking for updates..."
+        
+        guard let url = URL(string: "https://jbluebird.github.io/iCopy/version.txt") else {
+            errorMessage = "Invalid version URL."
+            statusMessage = "Ready to check for updates."
+            isChecking = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            DispatchQueue.main.async {
+                isChecking = false
+                
+                guard error == nil, let data = data, let content = String(data: data, encoding: .utf8) else {
+                    errorMessage = "Failed to download version info: \(error?.localizedDescription ?? "Unknown error")"
+                    statusMessage = "Ready to check for updates."
+                    return
+                }
+                
+                guard let firstLine = content.split(separator: "\n").first else {
+                    errorMessage = "Empty version file."
+                    statusMessage = "Ready to check for updates."
+                    return
+                }
+                
+                let versionString = firstLine.split(separator: " ").first.map(String.init) ?? ""
+                latestVersion = versionString
+                
+                if versionString.compare(currentAppVersion, options: .numeric) == .orderedDescending {
+                    updateAvailable = true
+                    statusMessage = "Update available: \(versionString)"
+                } else {
+                    statusMessage = "No updates available. You're up to date!"
+                }
+            }
+        }.resume()
+    }
+    
+    func downloadAndInstallUpdate() {
+        guard let downloadURL = URL(string: "https://jbluebird.github.io/h/iCopy2.zip") else {
+            errorMessage = "Invalid download URL."
+            return
+        }
+        
+        isDownloading = true
+        errorMessage = nil
+        statusMessage = "Downloading update..."
+        
+        let downloadsFolder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let destinationZipURL = downloadsFolder.appendingPathComponent("iCopy2.zip")
+        
+        URLSession.shared.downloadTask(with: downloadURL) { tempLocalUrl, _, error in
+            DispatchQueue.main.async {
+                isDownloading = false
+                
+                guard let tempLocalUrl = tempLocalUrl, error == nil else {
+                    errorMessage = "Download error: \(error?.localizedDescription ?? "Unknown error")"
+                    statusMessage = "Ready to check for updates."
+                    return
+                }
+                
+                do {
+                    if FileManager.default.fileExists(atPath: destinationZipURL.path) {
+                        try FileManager.default.removeItem(at: destinationZipURL)
+                    }
+                    try FileManager.default.moveItem(at: tempLocalUrl, to: destinationZipURL)
+                    
+                    // Unzip
+                    try runShellCommand("/usr/bin/ditto", args: ["-xk", destinationZipURL.path, downloadsFolder.path])
+
+                    
+                    // Set executable permission for the extracted app executable
+                    let appPath = downloadsFolder.appendingPathComponent("iCopy.app/Contents/MacOS/iCopy").path
+                    try runShellCommand("/bin/chmod", args: ["+x", appPath])
+                    
+                    statusMessage = "Update installed! Check your downloads folder."
+                } catch {
+                    errorMessage = "Update failed: \(error.localizedDescription)"
+                    statusMessage = "Ready to check for updates."
+                }
+            }
+        }.resume()
+    }
+    
+    func runShellCommand(_ launchPath: String, args: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = args
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        if process.terminationStatus != 0 {
+            throw NSError(domain: "UpdateError", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: "Shell command failed with status \(process.terminationStatus)"])
+        }
     }
 }
