@@ -18,7 +18,10 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
 ***Versions***
 
-> **iCopy 1.2 Silicon/Intel** *(Latest)*
+> **iCopy 1.3 Silicon/Intel** *(Latest)*
+> In this update, iCopy updated it's update system.
+
+> **iCopy 1.2 Silicon/Intel**
 > In this update, iCopy came for intel Macs. Also, iCopy is equipped with a update feature
 
 > **iCopy 1.1 Silicon**
