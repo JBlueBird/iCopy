@@ -1,21 +1,3 @@
-# I made a app to easily get your music off of old iPods
-
-![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-397g0bn52hhf1.png?width=640&crop=smart&auto=webp&s=f107b1a2ff1cd941b3d399f411d106d0ef9e9037)
-
-*Play, search, and copy your music off your iPod*
-
-
-![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-80tgaen52hhf1.png?width=640&crop=smart&auto=webp&s=ced5cba66d5e1a248e9b76e43b24db225520fade)
-
-*Transcribe your Voice Memos with Apple's Speech Model*
-
-
-![no alt text](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-w5hcten52hhf1.png?width=640&crop=smart&auto=webp&s=fd9e6cb557a1c21b149d02bd88f16e40f04a4b42)
-
-*Copy your voice memos off your iPod*
-
-
-
 **iCopy - Transfer your music with ease**
 
 ![Stars](https://img.shields.io/github/stars/JBlueBird/iCopy?style=flat) ![Last Commit](https://img.shields.io/github/last-commit/JBlueBird/iCopy)  ![Last Commit](https://img.shields.io/badge/iCopy_Versions_Released-3-blue) [![Reddit](https://img.shields.io/badge/Reddit_Post-orange?&style=flat)](https://www.reddit.com/r/ipod/comments/1mji6ia/i_made_a_app_to_easily_get_your_music_off_of_old/)
@@ -50,3 +32,19 @@ Here’s a download link if you want to check it out. Happy to answer any questi
  - [ ] Make a windows version
  - [ ] Add .ithmb file support for photos
  - [x] Intel Support (Added in [Update 1.2](http://jbluebird.github.io/h/iCopy2.zip))
+
+***Screenshots***
+
+![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-397g0bn52hhf1.png?width=640&crop=smart&auto=webp&s=f107b1a2ff1cd941b3d399f411d106d0ef9e9037)
+
+*Play, search, and copy your music off your iPod*
+
+
+![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-80tgaen52hhf1.png?width=640&crop=smart&auto=webp&s=ced5cba66d5e1a248e9b76e43b24db225520fade)
+
+*Transcribe your Voice Memos with Apple's Speech Model*
+
+
+![no alt text](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-w5hcten52hhf1.png?width=640&crop=smart&auto=webp&s=fd9e6cb557a1c21b149d02bd88f16e40f04a4b42)
+
+*Copy your voice memos off your iPod*
