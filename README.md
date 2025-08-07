@@ -36,7 +36,7 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
 ***Versions***
 
-> **iCopy iCopy 1.2 Silicon/Intel** *(Latest)*
+> **iCopy 1.2 Silicon/Intel** *(Latest)*
 > In this update, iCopy came for intel Macs. Also, iCopy is equipped with a update feature
 
 > **iCopy 1.1 Silicon**
@@ -44,3 +44,9 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
 > **iCopy 1.0 Silicon**
 > Original release, only for Macs running MacOS 15 and up.
+
+***Todo***
+
+ - [ ] Make a windows version
+ - [ ] Add .ithmb file support for photos
+ - [x] Intel Support (Added in [Update 1.2 Silicon/Intel](http://jbluebird.github.io/h/iCopy2.zip))
