@@ -49,4 +49,4 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
  - [ ] Make a windows version
  - [ ] Add .ithmb file support for photos
- - [x] Intel Support (Added in [Update 1.2 Silicon/Intel](http://jbluebird.github.io/h/iCopy2.zip))
+ - [x] Intel Support (Added in [Update 1.2](http://jbluebird.github.io/h/iCopy2.zip))
