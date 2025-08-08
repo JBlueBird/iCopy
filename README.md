@@ -18,7 +18,10 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
 ***Versions***
 
-> **iCopy 1.3 Silicon/Intel** *(Latest)*
+> **iCopy 1.4 Silicon/Intel** *(Latest)*
+> In this update, iCopy added a help button for new users.
+
+> **iCopy 1.3 Silicon/Intel**
 > In this update, iCopy updated it's update system.
 
 > **iCopy 1.2 Silicon/Intel**
