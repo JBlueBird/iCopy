@@ -1,4 +1,4 @@
-**iCopy - Transfer your music with ease**
+**iCopy - Transfer your music with ease** *(Licensed with MIT)*
 
 ![Stars](https://img.shields.io/github/stars/JBlueBird/iCopy?style=flat) ![Last Commit](https://img.shields.io/github/last-commit/JBlueBird/iCopy)  ![Last Commit](https://img.shields.io/badge/iCopy_Versions_Released-3-blue) [![Reddit](https://img.shields.io/badge/Reddit_Post-orange?&style=flat)](https://www.reddit.com/r/ipod/comments/1mji6ia/i_made_a_app_to_easily_get_your_music_off_of_old/)
 
