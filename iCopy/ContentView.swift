@@ -3,6 +3,9 @@ import AVFoundation
 import AppKit
 import Speech
 import Foundation
+import PDFKit
+
+
 // MARK: - ViewModel
 
 class iCopyViewModel: ObservableObject {
@@ -434,6 +437,8 @@ enum MediaCategory: String, CaseIterable, Identifiable {
 struct iCopyApp: App {
     @StateObject private var vm = iCopyViewModel()
     @State var updateview = false
+    @State var showhelp = false
+    
     var body: some Scene {
         WindowGroup {
             NavigationSplitView {
@@ -468,8 +473,16 @@ struct iCopyApp: App {
                     case .voiceMemos:
                         vm.autoDetectVoiceMemos()
                     }
+                }.toolbar {
+                    Button() {
+                        showhelp.toggle()
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                    }
+                    NavigationLink(destination: UpdateView()) {
+                        Text("Update iCopy")
+                    }
                 }
-
                 .frame(minWidth: 600, minHeight: 500)
                 .navigationTitle(vm.selectedCategory.rawValue)
                 .onAppear {
@@ -477,13 +490,17 @@ struct iCopyApp: App {
                         vm.autoDetectiPod()
                     }
                 }
-            }.toolbar {
-                Button("Update iCopy") {
-                    updateview.toggle()
+                .sheet(isPresented: $showhelp) {
+                    if let url = Bundle.main.url(forResource: "Getting Started with iCopy", withExtension: "pdf") {
+                        PDFSheetView(url: url).frame(height: 600)
+                    } else {
+                        Text("PDF not found")
+                    }
+                    Button("Done") {
+                        showhelp.toggle()
+                    }.padding()
                 }
-            }.sheet(isPresented: $updateview, content: {
-                UpdateView()
-            })
+            }
         }
     }
     
@@ -499,7 +516,17 @@ struct iCopyApp: App {
 // MARK: - Music View
 
 struct MusicView: View {
+    let currentAppVersion = "1.4"
+
     @ObservedObject var vm: iCopyViewModel
+    @State private var statusMessage = "Ready to check for updates."
+    @State private var isChecking = false
+    @State private var isDownloading = false
+    @State private var updateAvailable = false
+    @State private var latestVersion: String?
+    @State private var errorMessage: String?
+    @State private var showUpdateAlert = false
+    @State private var showUpdateDoneAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -527,6 +554,21 @@ struct MusicView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .onAppear {
+                checkForUpdate()
+            }
+            .alert("Update Available", isPresented: $showUpdateAlert) {
+                Button("Download and Install") {
+                    downloadAndInstallUpdate()
+                }
+            } message: {
+                Text("iCopy needs to update to (\(latestVersion ?? "?")) to work properly.")
+            }.alert("Update Done!", isPresented: $showUpdateDoneAlert) {
+                Button("Ok, got it.") {}
+            } message: {
+                Text("You will find the new version of iCopy in your downloads folder. Please replace this version with the new one.")
+            }
+            
             MiniPlayerView(vm: vm)
 
             Divider()
@@ -585,74 +627,109 @@ struct MusicView: View {
                     }
                 }
                 .padding(.vertical)
+                
             }
         }
     }
-}
-
-// MARK: - Album Artwork View
-
-struct AlbumArtworkView: View {
-    var artwork: NSImage?
+    func checkForUpdate() {
+        isChecking = true
+        errorMessage = nil
+        updateAvailable = false
+        statusMessage = "Checking for updates..."
+        
+        guard let url = URL(string: "https://jbluebird.github.io/iCopy/version.txt") else {
+            errorMessage = "Invalid version URL."
+            statusMessage = "Ready to check for updates."
+            isChecking = false
+            return
+        }
+        
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            DispatchQueue.main.async {
+                isChecking = false
+                
+                guard error == nil, let data = data,
+                      let content = String(data: data, encoding: .utf8),
+                      let firstLine = content.split(separator: "\n").first else {
+                    errorMessage = "Failed to load version info."
+                    statusMessage = "Ready to check for updates."
+                    return
+                }
+                
+                let versionString = firstLine.split(separator: " ").first.map(String.init) ?? ""
+                latestVersion = versionString
+                
+                if versionString.compare(currentAppVersion, options: .numeric) == .orderedDescending {
+                    updateAvailable = true
+                    statusMessage = "Update available: \(versionString)"
+                    showUpdateAlert = true
+                } else {
+                    updateAvailable = false
+                    statusMessage = "No updates available. You're up to date!"
+                }
+            }
+        }.resume()
+    }
     
-    var body: some View {
-        if let img = artwork {
-            Image(nsImage: img)
-                .resizable()
-                .scaledToFill()
-                .clipped()
-                .shadow(radius: 3)
-            
-        } else {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.gray.opacity(0.3))
-                .overlay(
-                    Image(systemName: "ipod")
-                        .font(.system(size: 40))
-                        .foregroundColor(.gray)
-                )
+    func downloadAndInstallUpdate() {
+        guard let downloadURL = URL(string: "https://jbluebird.github.io/h/iCopy2.zip") else {
+            errorMessage = "Invalid download URL."
+            return
         }
+        
+        isDownloading = true
+        errorMessage = nil
+        statusMessage = "Downloading update..."
+        
+        let downloadsFolder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
+        let destinationZipURL = downloadsFolder.appendingPathComponent("iCopy2.zip")
+        
+        URLSession.shared.downloadTask(with: downloadURL) { tempLocalUrl, _, error in
+            DispatchQueue.main.async {
+                isDownloading = false
+                
+                guard let tempLocalUrl = tempLocalUrl, error == nil else {
+                    errorMessage = "Download error: \(error?.localizedDescription ?? "Unknown error")"
+                    statusMessage = "Ready to check for updates."
+                    return
+                }
+                
+                do {
+                    if FileManager.default.fileExists(atPath: destinationZipURL.path) {
+                        try FileManager.default.removeItem(at: destinationZipURL)
+                    }
+                    try FileManager.default.moveItem(at: tempLocalUrl, to: destinationZipURL)
+                    
+                    try runShellCommand("/usr/bin/ditto", args: ["-xk", destinationZipURL.path, downloadsFolder.path])
+                    
+                    let appPath = downloadsFolder.appendingPathComponent("iCopy.app/Contents/MacOS/iCopy").path
+                    try runShellCommand("/bin/chmod", args: ["+x", appPath])
+                    
+                    statusMessage = "Update installed! Check your Downloads folder for the new iCopy."
+                    
+                    showUpdateDoneAlert = true
+
+                } catch {
+                    errorMessage = "Update failed: \(error.localizedDescription)"
+                    statusMessage = "Ready to check for updates."
+                }
+            }
+        }.resume()
     }
-}
-
-// MARK: - Track Row
-
-struct TrackRow: View {
-    let track: Track
-    let isSelected: Bool
-    let onToggle: () -> Void
     
-    var body: some View {
-        HStack(spacing: 14) {
-            Button(action: onToggle) {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .accentColor : .gray)
-                    .font(.system(size: 20))
-            }
-            .buttonStyle(.plain)
-            
-            
-            VStack(alignment: .leading) {
-                Text(track.title)
-                    .font(.headline)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Text(track.url.lastPathComponent)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-            }
-            
-            Spacer()
+    func runShellCommand(_ launchPath: String, args: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = args
+        
+        try process.run()
+        process.waitUntilExit()
+        
+        if process.terminationStatus != 0 {
+            throw NSError(domain: "ShellCommandError", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: "Shell command failed with exit code \(process.terminationStatus)"])
         }
-        .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        //.hoverEffect(.highlight)
     }
 }
-
-
 
 // MARK: - PhotoItem
 
@@ -1171,160 +1248,5 @@ struct MiniPlayerView: View {
         let mins = Int(time) / 60
         let secs = Int(time) % 60
         return String(format: "%d:%02d", mins, secs)
-    }
-}
-struct UpdateView: View {
-    @Environment(\.dismiss) var dismiss
-    
-    // Current app version - set yours here or pass in init
-    let currentAppVersion = "1.2"
-    
-    // State vars
-    @State private var statusMessage = "Ready to check for updates."
-    @State private var isChecking = false
-    @State private var isDownloading = false
-    @State private var updateAvailable = false
-    @State private var latestVersion: String?
-    @State private var errorMessage: String?
-    
-    var body: some View {
-        VStack() {
-            Text("iCopy Update")
-                .font(.title)
-                .bold()
-            Divider()
-            
-            Text(statusMessage)
-                .multilineTextAlignment(.center)
-                .padding()
-            
-            if isChecking || isDownloading {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle())
-            }
-            
-            if statusMessage == "No updates available. You're up to date!" {} else {
-                if statusMessage == "Update installed! Check your downloads folder." {
-                    EmptyView()
-                } else {
-                    Button("Download and Install Update \(latestVersion ?? "")") {
-                        downloadAndInstallUpdate()
-                    }.disabled(isDownloading).onAppear(perform: checkForUpdate)
-                }
-            }
-            
-            if let error = errorMessage {
-                Text("Error: \(error)")
-                    .foregroundColor(.red)
-            }
-            
-            Button("Close") {
-                dismiss()
-            }
-            .keyboardShortcut(.cancelAction)
-        }
-        .padding(30)
-        .frame(width: 350)
-    }
-    
-    func checkForUpdate() {
-        isChecking = true
-        errorMessage = nil
-        updateAvailable = false
-        statusMessage = "Checking for updates..."
-        
-        guard let url = URL(string: "https://jbluebird.github.io/iCopy/version.txt") else {
-            errorMessage = "Invalid version URL."
-            statusMessage = "Ready to check for updates."
-            isChecking = false
-            return
-        }
-        
-        URLSession.shared.dataTask(with: url) { data, _, error in
-            DispatchQueue.main.async {
-                isChecking = false
-                
-                guard error == nil, let data = data, let content = String(data: data, encoding: .utf8) else {
-                    errorMessage = "Failed to download version info: \(error?.localizedDescription ?? "Unknown error")"
-                    statusMessage = "Ready to check for updates."
-                    return
-                }
-                
-                guard let firstLine = content.split(separator: "\n").first else {
-                    errorMessage = "Empty version file."
-                    statusMessage = "Ready to check for updates."
-                    return
-                }
-                
-                let versionString = firstLine.split(separator: " ").first.map(String.init) ?? ""
-                latestVersion = versionString
-                
-                if versionString.compare(currentAppVersion, options: .numeric) == .orderedDescending {
-                    updateAvailable = true
-                    statusMessage = "Update available: \(versionString)"
-                } else {
-                    statusMessage = "No updates available. You're up to date!"
-                }
-            }
-        }.resume()
-    }
-    
-    func downloadAndInstallUpdate() {
-        guard let downloadURL = URL(string: "https://jbluebird.github.io/h/iCopy2.zip") else {
-            errorMessage = "Invalid download URL."
-            return
-        }
-        
-        isDownloading = true
-        errorMessage = nil
-        statusMessage = "Downloading update..."
-        
-        let downloadsFolder = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first!
-        let destinationZipURL = downloadsFolder.appendingPathComponent("iCopy2.zip")
-        
-        URLSession.shared.downloadTask(with: downloadURL) { tempLocalUrl, _, error in
-            DispatchQueue.main.async {
-                isDownloading = false
-                
-                guard let tempLocalUrl = tempLocalUrl, error == nil else {
-                    errorMessage = "Download error: \(error?.localizedDescription ?? "Unknown error")"
-                    statusMessage = "Ready to check for updates."
-                    return
-                }
-                
-                do {
-                    if FileManager.default.fileExists(atPath: destinationZipURL.path) {
-                        try FileManager.default.removeItem(at: destinationZipURL)
-                    }
-                    try FileManager.default.moveItem(at: tempLocalUrl, to: destinationZipURL)
-                    
-                    // Unzip
-                    try runShellCommand("/usr/bin/ditto", args: ["-xk", destinationZipURL.path, downloadsFolder.path])
-
-                    
-                    // Set executable permission for the extracted app executable
-                    let appPath = downloadsFolder.appendingPathComponent("iCopy.app/Contents/MacOS/iCopy").path
-                    try runShellCommand("/bin/chmod", args: ["+x", appPath])
-                    
-                    statusMessage = "Update installed! Check your downloads folder."
-                } catch {
-                    errorMessage = "Update failed: \(error.localizedDescription)"
-                    statusMessage = "Ready to check for updates."
-                }
-            }
-        }.resume()
-    }
-    
-    func runShellCommand(_ launchPath: String, args: [String]) throws {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: launchPath)
-        process.arguments = args
-        
-        try process.run()
-        process.waitUntilExit()
-        
-        if process.terminationStatus != 0 {
-            throw NSError(domain: "UpdateError", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: "Shell command failed with status \(process.terminationStatus)"])
-        }
     }
 }
