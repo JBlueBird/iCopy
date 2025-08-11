@@ -2,7 +2,7 @@
 //  AlbumArtworkView.swift
 //  iCopy
 //
-//  Created by Josiah on 8/8/25.
+//  Created by JBlueBird on 8/8/25.
 //
 import SwiftUI
 
