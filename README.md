@@ -17,8 +17,10 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 [Click me to download iCopy](http://jbluebird.github.io/h/iCopy2.zip)
 
 ***Versions***
+> **iCopy 1.5 Silicon/Intel** *(Latest)*
+> In this update, iCopy removed the help button (adding it back later), added compatibility for macOS Big Sur and above, added a progress view for loading Photos, Music and Voice Memos, added a manual re detect iPod button
 
-> **iCopy 1.4 Silicon/Intel** *(Latest)*
+> **iCopy 1.4 Silicon/Intel**
 > In this update, iCopy added a help button for new users.
 
 > **iCopy 1.3 Silicon/Intel**
