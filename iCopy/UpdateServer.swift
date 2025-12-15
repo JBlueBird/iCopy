@@ -7,9 +7,10 @@
 import SwiftUI
 
 struct UpdateView: View {
-    @Environment(\.dismiss) var dismiss
-    
-    let currentAppVersion = "1.4"
+    // Big Sur-compatible dismissal
+    @Environment(\.presentationMode) private var presentationMode
+
+    let currentAppVersion = "1.5"
     
     @State private var statusMessage = "Ready to check for updates."
     @State private var isChecking = false
@@ -49,7 +50,7 @@ struct UpdateView: View {
             }
             
             Button("Close") {
-                dismiss()
+                presentationMode.wrappedValue.dismiss()
             }
             .keyboardShortcut(.cancelAction)
         }
@@ -57,16 +58,25 @@ struct UpdateView: View {
         .onAppear {
             checkForUpdate()
         }
-        .alert("Update Available", isPresented: $showUpdateAlert) {
-            Button("Download and Install") {
-                downloadAndInstallUpdate()
-            }
-        } message: {
-            Text("iCopy needs to update to (\(latestVersion ?? "?")) to work properly.")
-        }.alert("Update Done!", isPresented: $showUpdateDoneAlert) {
-            Button("Ok, got it.") {dismiss()}
-        } message: {
-            Text("You will find the new version of iCopy in your downloads folder. Please replace this version with the new one.")
+        // Use Big Sur-compatible alerts
+        .alert(isPresented: $showUpdateAlert) {
+            Alert(
+                title: Text("Update Available"),
+                message: Text("iCopy needs to update to (\(latestVersion ?? "?")) to work properly."),
+                primaryButton: .default(Text("Download and Install"), action: {
+                    downloadAndInstallUpdate()
+                }),
+                secondaryButton: .cancel()
+            )
+        }
+        .alert(isPresented: $showUpdateDoneAlert) {
+            Alert(
+                title: Text("Update Done!"),
+                message: Text("You will find the new version of iCopy in your downloads folder. Please replace this version with the new one."),
+                dismissButton: .default(Text("Ok, got it."), action: {
+                    presentationMode.wrappedValue.dismiss()
+                })
+            )
         }
         Spacer()
     }

@@ -293,13 +293,13 @@ class iCopyViewModel: ObservableObject {
         if panel.runModal() == .OK, let url = panel.url {
             sourceFolder = url
             statusMessage = "Folder selected: \(url.lastPathComponent)"
-            if selectedCategory == .music {
+            switch selectedCategory {
+            case .music:
                 loadTracks(from: url)
-            } else {
-                // Future: Load photos, voice memos, etc.
-                tracks = []
-                groupedTracks = [:]
-                debug("Selected folder for \(selectedCategory.rawValue): \(url.path) (feature not implemented)")
+            case .photos:
+                loadPhotos(from: url)
+            case .voiceMemos:
+                loadVoiceMemos(from: url)
             }
             debug("Manually selected folder: \(url.path)")
         }
@@ -436,25 +436,71 @@ enum MediaCategory: String, CaseIterable, Identifiable {
 @main
 struct iCopyApp: App {
     @StateObject private var vm = iCopyViewModel()
-    @State var updateview = false
+    @State private var showingUpdateSheet = false
     @State var showhelp = false
+    
+    // App-level updater state
+    private let currentAppVersion = "1.5"
+    @State private var isCheckingUpdate = false
+    @State private var latestVersion: String?
+    @State private var showAutoUpdateAlert = false
+    @State private var updateError: String?
     
     var body: some Scene {
         WindowGroup {
-            NavigationSplitView {
+            NavigationView {
                 // Sidebar
-                List(selection: $vm.selectedCategory) {
-                    ForEach(MediaCategory.allCases) { category in
-                        Label(category.rawValue, systemImage: iconName(for: category))
-                            .tag(category)
+                Group {
+                    if #available(macOS 13.0, *) {
+                        List(selection: $vm.selectedCategory) {
+                            ForEach(MediaCategory.allCases) { category in
+                                Text(category.rawValue)
+                                    .tag(category)
+                            }
+                        }
+                    } else {
+                        List {
+                            ForEach(MediaCategory.allCases) { category in
+                                Button(action: { 
+                                    vm.selectedCategory = category
+                                    // Trigger auto-detect on category switch for older macOS
+                                    switch category {
+                                    case .music: vm.autoDetectiPod()
+                                    case .photos: vm.autoDetectPhotos()
+                                    case .voiceMemos: vm.autoDetectVoiceMemos()
+                                    }
+                                }) {
+                                    HStack {
+                                        Text(category.rawValue)
+                                        Spacer()
+                                        if vm.selectedCategory == category {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(.accentColor)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
                 }
                 .listStyle(SidebarListStyle())
                 .frame(minWidth: 150)
-                
-            } detail: {
+                .toolbar {
+                    ToolbarItem(placement: .automatic) {
+                        Button("Update iCopy") {
+                            showingUpdateSheet = true
+                        }
+                    }
+                    ToolbarItem(placement: .automatic) {
+                        Button("Scan for iPods") {
+                            scanCurrentCategory()
+                        }
+                    }
+                }
+
+                // Detail
                 VStack {
-                    // Content Area
                     switch vm.selectedCategory {
                     case .music:
                         MusicView(vm: vm)
@@ -462,25 +508,6 @@ struct iCopyApp: App {
                         PhotoGridView(vm: vm)
                     case .voiceMemos:
                         VoiceMemoListView(vm: vm)
-                    }
-                }.onChange(of: vm.selectedCategory) { newCategory in
-                    vm.statusMessage = "Scanning..."
-                    switch newCategory {
-                    case .music:
-                        vm.autoDetectiPod()
-                    case .photos:
-                        vm.autoDetectPhotos()
-                    case .voiceMemos:
-                        vm.autoDetectVoiceMemos()
-                    }
-                }.toolbar {
-                    Button() {
-                        showhelp.toggle()
-                    } label: {
-                        Image(systemName: "questionmark.circle")
-                    }
-                    NavigationLink(destination: UpdateView()) {
-                        Text("Update iCopy")
                     }
                 }
                 .frame(minWidth: 600, minHeight: 500)
@@ -490,17 +517,95 @@ struct iCopyApp: App {
                         vm.autoDetectiPod()
                     }
                 }
-                .sheet(isPresented: $showhelp) {
-                    if let url = Bundle.main.url(forResource: "Getting Started with iCopy", withExtension: "pdf") {
-                        PDFSheetView(url: url).frame(height: 600)
-                    } else {
-                        Text("PDF not found")
-                    }
-                    Button("Done") {
-                        showhelp.toggle()
-                    }.padding()
+            }
+            .sheet(isPresented: $showingUpdateSheet) {
+                UpdateView()
+            }
+            .onAppear {
+                // Kick off detection for initial category
+                switch vm.selectedCategory {
+                case .music: vm.autoDetectiPod()
+                case .photos: vm.autoDetectPhotos()
+                case .voiceMemos: vm.autoDetectVoiceMemos()
+                }
+                // Auto-check for updates at launch
+                checkForUpdate()
+            }
+        }
+    }
+    
+    private func scanCurrentCategory() {
+        switch vm.selectedCategory {
+        case .music:
+            vm.autoDetectiPod()
+        case .photos:
+            vm.autoDetectPhotos()
+        case .voiceMemos:
+            vm.autoDetectVoiceMemos()
+        }
+    }
+    
+    // MARK: - Auto Update (App-level)
+
+    private func checkForUpdate() {
+        isCheckingUpdate = true
+        updateError = nil
+        
+        guard let url = URL(string: "https://jbluebird.github.io/iCopy/version.txt") else {
+            isCheckingUpdate = false
+            return
+        }
+        URLSession.shared.dataTask(with: url) { data, _, error in
+            DispatchQueue.main.async {
+                self.isCheckingUpdate = false
+                guard error == nil, let data = data,
+                      let content = String(data: data, encoding: .utf8),
+                      let firstLine = content.split(separator: "\n").first else {
+                    return
+                }
+                let versionString = firstLine.split(separator: " ").first.map(String.init) ?? ""
+                self.latestVersion = versionString
+                if versionString.compare(self.currentAppVersion, options: .numeric) == .orderedDescending {
+                    self.showAutoUpdateAlert = true
                 }
             }
+        }.resume()
+    }
+    
+    private func downloadAndInstallUpdate() {
+        guard let downloadURL = URL(string: "https://jbluebird.github.io/h/iCopy2.zip") else { return }
+        
+        let desktop = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask).first!
+        let destinationZipURL = desktop.appendingPathComponent("iCopy2.zip")
+        
+        URLSession.shared.downloadTask(with: downloadURL) { tempLocalUrl, _, error in
+            DispatchQueue.main.async {
+                guard let tempLocalUrl = tempLocalUrl, error == nil else { return }
+                do {
+                    if FileManager.default.fileExists(atPath: destinationZipURL.path) {
+                        try FileManager.default.removeItem(at: destinationZipURL)
+                    }
+                    try FileManager.default.moveItem(at: tempLocalUrl, to: destinationZipURL)
+                    
+                    try runShellCommand("/usr/bin/ditto", args: ["-xk", destinationZipURL.path, desktop.path])
+                    
+                    let appPath = desktop.appendingPathComponent("iCopy.app/Contents/MacOS/iCopy").path
+                    try runShellCommand("/bin/chmod", args: ["+x", appPath])
+                } catch {
+                    // swallow errors for now
+                }
+            }
+        }.resume()
+    }
+    
+    private func runShellCommand(_ launchPath: String, args: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: launchPath)
+        process.arguments = args
+        try process.run()
+        process.waitUntilExit()
+        if process.terminationStatus != 0 {
+            throw NSError(domain: "ShellCommandError", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: "Shell command failed with exit code \(process.terminationStatus)"])
         }
     }
     
@@ -515,8 +620,20 @@ struct iCopyApp: App {
 
 // MARK: - Music View
 
+private enum MusicViewAlertKind: Identifiable {
+    case updateAvailable
+    case updateDone
+
+    var id: Int {
+        switch self {
+        case .updateAvailable: return 1
+        case .updateDone: return 2
+        }
+    }
+}
+
 struct MusicView: View {
-    let currentAppVersion = "1.4"
+    let currentAppVersion = "1.5"
 
     @ObservedObject var vm: iCopyViewModel
     @State private var statusMessage = "Ready to check for updates."
@@ -525,16 +642,16 @@ struct MusicView: View {
     @State private var updateAvailable = false
     @State private var latestVersion: String?
     @State private var errorMessage: String?
-    @State private var showUpdateAlert = false
-    @State private var showUpdateDoneAlert = false
-    
+    // Big Sur-safe: single alert driver
+    @State private var activeAlert: MusicViewAlertKind?
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Button("Copy Selected") {
                     vm.copySelectedTracks()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(vm.filteredTracks.isEmpty || vm.selectedTracks.isEmpty)
                 
                 Button("Copy All") {
@@ -545,7 +662,13 @@ struct MusicView: View {
                 Button("Import Folder") {
                     vm.selectMediaFolder()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
+                
+                Button("Scan for iPods") {
+                    vm.autoDetectiPod()
+                }
+                .buttonStyle(.bordered)
+                
                 Spacer()
                 TextField("Search \(vm.selectedCategory.rawValue)", text: $vm.searchText)
                     .textFieldStyle(.roundedBorder)
@@ -557,77 +680,88 @@ struct MusicView: View {
             .onAppear {
                 checkForUpdate()
             }
-            .alert("Update Available", isPresented: $showUpdateAlert) {
-                Button("Download and Install") {
-                    downloadAndInstallUpdate()
+            // Single .alert modifier for Big Sur using Identifiable item
+            .alert(item: Binding(get: {
+                activeAlert
+            }, set: { _ in
+                activeAlert = nil
+            })) { item in
+                switch item {
+                case .updateAvailable:
+                    return Alert(
+                        title: Text("Update Available"),
+                        message: Text("iCopy needs to update to (\(latestVersion ?? "?")) to work properly."),
+                        primaryButton: .default(Text("Download and Install"), action: {
+                            downloadAndInstallUpdate()
+                        }),
+                        secondaryButton: .cancel()
+                    )
+                case .updateDone:
+                    return Alert(
+                        title: Text("Update Done!"),
+                        message: Text("You will find the new version of iCopy in your downloads folder. Please replace this version with the new one."),
+                        dismissButton: .default(Text("Ok, got it."))
+                    )
                 }
-            } message: {
-                Text("iCopy needs to update to (\(latestVersion ?? "?")) to work properly.")
-            }.alert("Update Done!", isPresented: $showUpdateDoneAlert) {
-                Button("Ok, got it.") {}
-            } message: {
-                Text("You will find the new version of iCopy in your downloads folder. Please replace this version with the new one.")
             }
             
             MiniPlayerView(vm: vm)
 
             Divider()
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    ForEach(vm.sortedArtistsFiltered, id: \.self) { artist in
-                        VStack(alignment: .leading, spacing: 12) {
-                            //Text(artist)
-                               // .font(.title2)
-                                //.bold()
-                               // .padding(.leading)
-                            
-                            ForEach(vm.sortedAlbumsFiltered(for: artist), id: \.self) { album in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    HStack(spacing: 12) {
-                                        AlbumArtworkView(artwork: vm.filteredGroupedTracks[artist]![album]!.first?.artwork)
-                                            .frame(width: 80, height: 80)
-                                            .cornerRadius(8)
-                                        VStack {
-                                            HStack{Text(album)
-                                                    .bold()
-                                                    .font(.title3)
-                                                .foregroundColor(.secondary);Spacer()}
-                                            HStack{Text("by \(artist)");Spacer()}
+            if vm.filteredTracks.isEmpty {
+                DiscoveryLogView(status: vm.statusMessage, logs: vm.debugLog)
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        ForEach(vm.sortedArtistsFiltered, id: \.self) { artist in
+                            VStack(alignment: .leading, spacing: 12) {
+                                ForEach(vm.sortedAlbumsFiltered(for: artist), id: \.self) { album in
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 12) {
+                                            AlbumArtworkView(artwork: vm.filteredGroupedTracks[artist]![album]!.first?.artwork)
+                                                .frame(width: 80, height: 80)
+                                                .cornerRadius(8)
+                                            VStack {
+                                                HStack{Text(album)
+                                                        .bold()
+                                                        .font(.title3)
+                                                    .foregroundColor(.secondary);Spacer()}
+                                                HStack{Text("by \(artist)");Spacer()}
+                                            }
+                                            
+                                            Spacer()
                                         }
-                                        
+                                        .padding(.leading)
                                         Spacer()
-                                    }
-                                    .padding(.leading)
-                                    Spacer()
-                                    
-                                    VStack {
-                                        ForEach(vm.filteredGroupedTracks[artist]![album]!) { track in
-                                            HStack {
-                                                TrackRow(track: track, isSelected: vm.selectedTracks.contains(track.id)) {
-                                                    if vm.selectedTracks.contains(track.id) {
-                                                        vm.selectedTracks.remove(track.id)
-                                                    } else {
-                                                        vm.selectedTracks.insert(track.id)
+                                        
+                                        VStack {
+                                            ForEach(vm.filteredGroupedTracks[artist]![album]!) { track in
+                                                HStack {
+                                                    TrackRow(track: track, isSelected: vm.selectedTracks.contains(track.id)) {
+                                                        if vm.selectedTracks.contains(track.id) {
+                                                            vm.selectedTracks.remove(track.id)
+                                                        } else {
+                                                            vm.selectedTracks.insert(track.id)
+                                                        }
                                                     }
+                                                    Button(action: { vm.play(track: track) }) {
+                                                        Image(systemName: "play.circle").font(.title)
+                                                    }.padding()
+                                                    .buttonStyle(.plain)
                                                 }
-                                                Button(action: { vm.play(track: track) }) {
-                                                    Image(systemName: "play.circle").font(.title)
-                                                }.padding()
-                                                .buttonStyle(.plain)
                                             }
                                         }
+                                        .padding(.leading, 100)
                                     }
-                                    .padding(.leading, 100)
-                                    //
                                 }
                             }
+                            Divider()
+                                .padding(.vertical, 12)
                         }
-                        Divider()
-                            .padding(.vertical, 12)
                     }
+                    .padding(.vertical)
+                    
                 }
-                .padding(.vertical)
-                
             }
         }
     }
@@ -662,7 +796,7 @@ struct MusicView: View {
                 if versionString.compare(currentAppVersion, options: .numeric) == .orderedDescending {
                     updateAvailable = true
                     statusMessage = "Update available: \(versionString)"
-                    showUpdateAlert = true
+                    activeAlert = .updateAvailable
                 } else {
                     updateAvailable = false
                     statusMessage = "No updates available. You're up to date!"
@@ -706,8 +840,7 @@ struct MusicView: View {
                     try runShellCommand("/bin/chmod", args: ["+x", appPath])
                     
                     statusMessage = "Update installed! Check your Downloads folder for the new iCopy."
-                    
-                    showUpdateDoneAlert = true
+                    activeAlert = .updateDone
 
                 } catch {
                     errorMessage = "Update failed: \(error.localizedDescription)"
@@ -785,11 +918,16 @@ struct PhotoGridView: View {
                 Button("Copy Selected") {
                     vm.copySelectedPhotos()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(vm.selectedPhotoItems.isEmpty)
 
                 Button("Import Folder") {
                     vm.selectMediaFolder()
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Scan for iPods") {
+                    vm.autoDetectPhotos()
                 }
                 .buttonStyle(.bordered)
 
@@ -801,16 +939,28 @@ struct PhotoGridView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .onAppear {
+                vm.autoDetectPhotos()
+            }
 
             Divider()
 
             if vm.filteredPhotos.isEmpty {
-                VStack(spacing: 12) {
-                    ProgressView()
+                VStack(spacing: 8) {
                     Text(vm.statusMessage)
                         .foregroundColor(.secondary)
+                    if !vm.debugLog.isEmpty {
+                        Divider()
+                        ScrollView {
+                            Text(vm.debugLog.joined(separator: "\n"))
+                                .font(.system(.caption, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding()
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 20) {
@@ -909,11 +1059,16 @@ struct VoiceMemoListView: View {
                 Button("Copy Selected") {
                     vm.copySelectedVoiceMemos()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.bordered)
                 .disabled(vm.selectedVoiceMemos.isEmpty)
 
                 Button("Import Folder") {
                     vm.selectMediaFolder()
+                }
+                .buttonStyle(.bordered)
+                
+                Button("Scan for iPods") {
+                    vm.autoDetectVoiceMemos()
                 }
                 .buttonStyle(.bordered)
 
@@ -925,16 +1080,28 @@ struct VoiceMemoListView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
+            .onAppear {
+                vm.autoDetectVoiceMemos()
+            }
             
             Divider()
 
             if vm.filteredVoiceMemos.isEmpty {
-                VStack(spacing: 12) {
-                    ProgressView()
+                VStack(spacing: 8) {
                     Text(vm.statusMessage)
                         .foregroundColor(.secondary)
+                    if !vm.debugLog.isEmpty {
+                        Divider()
+                        ScrollView {
+                            Text(vm.debugLog.joined(separator: "\n"))
+                                .font(.system(.caption, design: .monospaced))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding()
+                        }
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding()
             } else {
                 List(selection: $vm.selectedVoiceMemos) {
                     ForEach(vm.filteredVoiceMemos) { memo in
@@ -942,9 +1109,13 @@ struct VoiceMemoListView: View {
                             Text(memo.title)
                                 .font(.headline)
                             if let date = memo.dateRecorded {
-                                Text(date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                if #available(macOS 12.0, *) {
+                                    Text(date.formatted(date: .abbreviated, time: .shortened))
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                } else {
+                                    // Fallback on earlier versions
+                                }
                             }
                             Spacer()
                             Text(formatDuration(memo.duration))
@@ -987,8 +1158,6 @@ struct VoiceMemoListView: View {
                     }
                     .frame(maxHeight: 150)
                 } else {
-                    Text("Select a voice memo, then right-click and choose Transcribe.")
-                        .foregroundColor(.secondary)
                 }
             }
             .padding()
@@ -1138,7 +1307,6 @@ struct MiniPlayerView: View {
                             .foregroundColor(.secondary)
 
                         Slider(value: $currentTime, in: 0...duration, onEditingChanged: sliderChanged)
-                            .accentColor(.accentColor)
 
                         Text("-\(formatTime(duration - currentTime))")
                             .font(.caption)
@@ -1248,5 +1416,28 @@ struct MiniPlayerView: View {
         let mins = Int(time) / 60
         let secs = Int(time) % 60
         return String(format: "%d:%02d", mins, secs)
+    }
+}
+
+// MARK: - Discovery Log View
+
+struct DiscoveryLogView: View {
+    let status: String
+    let logs: [String]
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Text(status)
+                .foregroundColor(.secondary)
+            Divider()
+            ScrollView {
+                Text(logs.joined(separator: "\n"))
+                    .font(.system(.caption, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding()
     }
 }
