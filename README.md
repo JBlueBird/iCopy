@@ -42,6 +42,16 @@ Here’s a download link if you want to check it out. Happy to answer any questi
  - [x] Intel Support (Added in [Update 1.2](http://jbluebird.github.io/h/iCopy2.zip))
  - [ ] Updates so iCopy can support iPod Touch (idk how to do that??)
 
+***Supporting iCopy***
+
+Hey there! If you liked iCopy and want to support it, an easy way to do this is embedding the retro internet badge on your website/blog. (it looks like this: <a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="60" height="20" alt="iCopy - Goodbye streaming!" style="image-rendering:  pixelated;"></a>)
+
+```html
+<a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="88" height="31" alt="iCopy - Goodbye streaming!" style="image-rendering:  pixelated;"></a>
+```
+
+Thanks for supporting and using iCopy!
+
 ***Screenshots***
 
 ![r/ipod - I made a app to easily get your music off of old iPods](https://preview.redd.it/i-made-a-app-to-easily-get-your-music-off-of-old-ipods-v0-397g0bn52hhf1.png?width=640&crop=smart&auto=webp&s=f107b1a2ff1cd941b3d399f411d106d0ef9e9037)
