@@ -44,7 +44,7 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 
 ***Supporting iCopy***
 
-Hey there! If you liked iCopy and want to support it, an easy way to do this is embedding the retro internet badge on your website/blog. (it looks like this: <a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="60" height="20" alt="iCopy - Goodbye streaming!" style="image-rendering:  pixelated;"></a>)
+Hey there! If you liked iCopy and want to support it, an easy way to do this is by embedding the retro internet badge on your website or blog. (It looks like this: <a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="60" height="20" alt="iCopy – Goodbye streaming!" style="image-rendering: pixelated;"></a>)
 
 ```html
 <a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="88" height="31" alt="iCopy - Goodbye streaming!" style="image-rendering:  pixelated;"></a>
