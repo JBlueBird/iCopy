@@ -35,13 +35,6 @@ Here’s a download link if you want to check it out. Happy to answer any questi
 > **iCopy 1.0 Silicon**
 > Original release, only for Macs running MacOS 15 and up.
 
-***Todo***
-
- - [ ] Make a windows version
- - [ ] Add .ithmb file support for photos (prob not going to happen, because these files are just raw photo thumbnails and the actual images can be extracted)
- - [x] Intel Support (Added in [Update 1.2](http://jbluebird.github.io/h/iCopy2.zip))
- - [ ] Updates so iCopy can support iPod Touch (idk how to do that??)
-
 ***Supporting iCopy***
 
 Hey there! If you liked iCopy and want to support it, an easy way to do this is by embedding the retro internet badge on your website or blog. (It looks like this: <a href="https://itzjpn.github.io/website/redir.html?redir=icopy" target="_blank" rel="noopener"><img src="https://itzjpn.github.io/files/icopy-goodbye-streaming.png" width="60" height="20" alt="iCopy – Goodbye streaming!" style="image-rendering: pixelated;"></a>)
